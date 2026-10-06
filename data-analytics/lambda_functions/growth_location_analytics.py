@@ -170,19 +170,25 @@ class GrowthLocationAnalytics:
         total_orgs_by_period = all_orgs.groupby("period").size().reset_index(name="count")
         total_orgs_by_period = total_orgs_by_period.sort_values("period")
         total_orgs_by_period["count"] = total_orgs_by_period["count"].cumsum()
-        total_orgs_list = total_orgs_by_period.to_dict("records")
+        total_count_by_period = dict(zip(
+            total_orgs_by_period["period"], total_orgs_by_period["count"]
+        ))
         
         # Collaborators: per-period count within the bucket window, not cumulative
         collab_by_period = org_in_window[org_in_window["is_collaborator"]].groupby("period").size().reset_index(name="count")
         collab_by_period = collab_by_period.sort_values("period")
-        collab_list = collab_by_period.to_dict("records")
-        
-        # Ensure both lists have same periods (fill missing periods with 0 for collaborators)
-        if total_orgs_list:
-            all_periods = sorted(set([x["period"] for x in total_orgs_list] + [x["period"] for x in collab_list]))
-            collab_dict = {x["period"]: x["count"] for x in collab_list}
-            collab_list = [{"period": p, "count": collab_dict.get(p, 0)} for p in all_periods]
-            total_orgs_list = [x for x in total_orgs_list if x["period"] in all_periods]
+        collaborator_count_by_period = dict(zip(
+            collab_by_period["period"], collab_by_period["count"]
+        ))
+        active_periods = sorted(org_in_window["period"].unique())
+        total_orgs_list = [
+            {"period": period, "count": total_count_by_period[period]}
+            for period in active_periods
+        ]
+        collab_list = [
+            {"period": period, "count": collaborator_count_by_period.get(period, 0)}
+            for period in active_periods
+        ]
         
         return {
             "total_organizations": total_orgs_list,
